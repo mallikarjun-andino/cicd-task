@@ -1,0 +1,49 @@
+name: Simple CI with Logs
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Print Trigger Info
+        run: |
+          echo " Workflow triggered!"
+          echo "Event name: ${{ github.event_name }}"
+          echo "Branch name: ${{ github.ref }}"
+          echo "Repository: ${{ github.repository }}"
+
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Show Node version before setup
+        run: node -v || echo "Node not installed yet"
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Confirm Node version
+        run: node -v
+
+      - name: Install dependencies
+        run: |
+          echo "Installing dependencies..."
+          npm ci
+
+      - name: Build project
+        run: |
+          echo "Building project..."
+          npm run build
+
+      - name: Success message
+        if: success()
+        run: echo " CI completed successfully!"
