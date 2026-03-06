@@ -1,49 +1,67 @@
 import { Injectable } from "@nestjs/common";
 import {Task} from "./interface/task.interface"
 import { TaskDTO } from "./dto/task.dto";
+import { TaskEntity } from "./entity/task.entity";
+import { InjectRepository } from "@nestjs/typeorm";
+import { Repository } from "typeorm";
+import { UpdateTaskDTO } from "./dto/updateTask.dto";
 
 @Injectable()
 export class TaskService{
 
-    private readonly tasks : Task[] = [
-        {id : "haha" , task : "buy milk"}
-    ];
+    constructor(
+        @InjectRepository(TaskEntity)
+        private readonly taskRepo : Repository<TaskEntity>
+    ){}
+
 
     heartbeat():string{
         return "Task API is responding !";
     }
 
-    createTask(dto: TaskDTO): Task[] {
-        const newTask: Task = {
-            id: Date.now().toString(),
+    async createTask(dto: TaskDTO): Promise<TaskEntity[]> {
+        const newTask: TaskEntity = this.taskRepo.create({
             task: dto.task,
-        }
-        this.tasks.push(newTask);
-        return this.tasks;
+            description : dto.description, 
+            isCompleted : dto.isCompleted 
+        });
+        await this.taskRepo.save(newTask);
+        return this.taskRepo.find();
     }   
 
-    alltasks():Task[]{
-        return this.tasks;
+    async allTasks(page?: number, limit?: number):Promise<TaskEntity[]>{
+        
+        if(!page || !limit){
+            return this.taskRepo.find();
+        }
+        
+        return this.taskRepo.find({
+            skip: (page - 1) * limit,
+            take: limit
+        });
     }
 
-    removetask(taskId: string): Task[] {
-        const index = this.tasks.findIndex(t => t.id === taskId);
-        this.tasks.splice(index, 1);
-        return this.tasks;
+    async removeTask(taskId: string): Promise<TaskEntity | null> {
+        const DeletedTask = await this.taskRepo.findOneBy({id : taskId});
+        await this.taskRepo.delete(taskId);
+        return DeletedTask;
     }
 
-    edittask(taskId : string,updatedTask : string) : Task[]{
-        const task = this.tasks.find(t => t.id == taskId)
-
-        if(!task) return this.tasks
-
-        task.task = updatedTask;
-
-        return this.tasks 
-
-
+    async editTask(taskId : string,updatedTask : UpdateTaskDTO) : Promise<TaskEntity | null>{
+        await this.taskRepo.update(taskId, updatedTask);
+        return this.taskRepo.findOneBy({id : taskId});
     }
 
+    async filterTasks(isCompleted : boolean) : Promise<TaskEntity[]>{
+        return this.taskRepo.findBy({ isCompleted : isCompleted });
+    }
+
+    async bulkCreate(dtos: TaskDTO[]): Promise<TaskEntity[]> {
+        return this.taskRepo.manager.transaction(async (manager) => {
+        const tasks = manager.create(TaskEntity, dtos);
+        return manager.save(tasks);
+  });
+}
 
 
 }
